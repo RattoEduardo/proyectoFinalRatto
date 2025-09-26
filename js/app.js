@@ -29,77 +29,79 @@ document.addEventListener("DOMContentLoaded", () => {
 })
 
 
-const url = "https://itunes.apple.com/search?term=techno&entity=musicTrack&limit=12"
+const url = "https://api.deezer.com/search?q=techno&limit=12&output=jsonp";
 
-async function cargarTracks() {
-    try {
-        const res = await fetch(url)
-        const dataTracks = await res.json()
-        mostrarTracks(dataTracks.results)
-    } catch(error) {
-        Swal.fire({
-            icon: 'error',
-            title: 'Oops...',
-            text: 'Error cargando tracks!',
-        })
-        console.error("Error cargando tracks:", error)
-    }
-}
+function cargarTracks() {
+    fetchJsonp(url)
+      .then(res => res.json())
+      .then(data => {
+        mostrarTracks(data.data);
+      })
+      .catch(error => console.error("Error cargando tracks:", error));
+  }
 
 
-function mostrarTracks(tracks) {
+  function mostrarTracks(tracks) {
     catalogo.innerHTML = ""
 
     tracks.forEach(track => {
         const div= document.createElement("div")
         div.classList.add("track")
         div.innerHTML = `
-            <img src="${track.artworkUrl100}" alt="${track.trackName}">
+            <img src="${track.album.cover_medium}" alt="${track.title}">
             <div class="track-info">
-               <h3>${track.trackName}</h3>
-               <p>${track.artistName}</p>
-               <p><strong>USD ${track.trackPrice || "0.99"}</strong></p>
+               <h3>${track.title}</h3>
+               <p>${track.artist.name}</p>
+               <p><strong>USD 0.99</strong></p>
             </div>  
             <div class="track-controls">
-                <audio controls src="${track.previewUrl}"></audio>
+                <audio controls src="${track.preview}"></audio>
             </div> 
         `
-
         const boton = document.createElement("button")
         boton.textContent = "Agregar al carrito"
-        boton.addEventListener("click", () => agregarAlCarrito(track))
+        boton.addEventListener("click", () => {
+            agregarAlCarrito({
+                id: track.id,
+                title: track.title,
+                artist: track.artist.name,
+                cover: track.album.cover_medium,
+                preview: track.preview,
+                cantidad: 1
+            })
+        })
 
         div.appendChild(boton)
         catalogo.appendChild(div)
     });
 }
 
-
 function agregarAlCarrito(track) {
-    const index = Carrito.findIndex(item => item.trackId === track.trackId)
+    const index = Carrito.findIndex(item => item.id === track.id)
     if(index !== -1) {
         Carrito[index].cantidad += 1
     } else {
-        Carrito.push({...track, cantidad: 1})
+        Carrito.push(track)
     }
+
     renderCarrito()
+
     Swal.fire({
         icon: 'success',
         title: 'Agregado al carrito!',
-        text: `${track.trackName} de ${track.artistName}`,
+        text: `${track.title} de ${track.artist}`,
         timer: 1000,
         showConfirmButton: false
-        
     })
 }
 
 function eliminarDelCarrito(trackId) {
-    Carrito = Carrito.filter(item => item.trackId !== trackId)
+    Carrito = Carrito.filter(item => item.id !== trackId)
     renderCarrito()
 }
 
 function calcularTotal() {
-    return Carrito.reduce((acc, item) => acc + (item.trackPrice || 0.99) * item.cantidad, 0)
+    return Carrito.reduce((acc, item) => acc + 0.99 * item.cantidad, 0)
 }
 
 
@@ -115,15 +117,15 @@ function renderCarrito() {
         const div = document.createElement("div")
         div.classList.add("carritoTarjeta")
         div.innerHTML = `
-            <h3>${item.trackName}</h3>
-            <p>${item.artistName}</p>
-            <p>Precio: USD ${item.trackPrice || 0.99}</p>
+            <h3>${item.title}</h3>
+            <p>${item.artist}</p>
+            <p>Precio: USD 0.99</p>
             <p>Cantidad: ${item.cantidad}</p>
-            <p>Subtotal: USD ${(item.trackPrice || 0.99) * item.cantidad}</p>
+            <p>Subtotal: USD ${(0.99 * item.cantidad).toFixed(2)}</p>
         `
         const botonEliminar = document.createElement("button")
         botonEliminar.textContent = "Eliminar"
-        botonEliminar.addEventListener("click", () => eliminarDelCarrito(item.trackId))
+        botonEliminar.addEventListener("click", () => eliminarDelCarrito(item.id))
         div.appendChild(botonEliminar)
 
         carritoContainer.appendChild(div)
@@ -131,7 +133,7 @@ function renderCarrito() {
 
     const totalDiv = document.createElement("div")
     totalDiv.style.marginTop = "15px"
-    totalDiv.innerHTML = `<h3>Total: USD ${calcularTotal().toFixed(2)}</h3>`
+    totalDiv.innerHTML = `<h3>Total: USD ${(Carrito.length * 0.99).toFixed(2)}</h3>`
     carritoContainer.appendChild(totalDiv)
 
     const botonComprar = document.createElement("button")
